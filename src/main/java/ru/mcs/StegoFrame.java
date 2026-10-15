@@ -138,7 +138,7 @@ public class StegoFrame extends JFrame {
             @Override
             protected File doInBackground() throws Exception {
                 BufferedImage result = StegoEngine.hideText(selectedImage, text, password);
-                File outFile = buildOutputFile(selectedFile);
+                File outFile = StegoEngine.buildOutputFile(selectedFile);
                 ImageIO.write(result, "png", outFile);
                 return outFile;
             }
@@ -194,21 +194,6 @@ public class StegoFrame extends JFrame {
                 }
             }
         }.execute();
-    }
-
-    private File buildOutputFile(File source) {
-        File dir = source.getParentFile();
-        String name = source.getName();
-        int dot = name.lastIndexOf('.');
-        String base = dot > 0 ? name.substring(0, dot) : name;
-
-        File candidate = new File(dir, base + "_stego.png");
-        int counter = 1;
-        while (candidate.exists()) {
-            candidate = new File(dir, base + "_stego_" + counter + ".png");
-            counter++;
-        }
-        return candidate;
     }
 
     private void setBusy(boolean busy) {

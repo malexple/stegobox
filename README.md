@@ -133,6 +133,44 @@ overhead = 4 (длина) + 16 (salt) + 12 (IV) + 16 (GCM-тег) = 48 байт
 
 ---
 
+## Консольный режим
+
+Кроме GUI, StegoBox работает и в терминале. Режим выбирается автоматически:
+если переданы аргументы — CLI, если нет — открывается окно.
+
+```
+stegobox hide    -i <img> -t <text> | --text-file <f> -p <pw> [-o <out>]
+stegobox extract -i <img> -p <pw> [-o <out.txt>]
+stegobox help
+stegobox version
+```
+
+Пароль можно не указывать — тогда он запросится интерактивно
+(через `System.console().readPassword()`), либо возьмётся из переменной
+окружения `STEKOBOX_PASSWORD`.
+
+Примеры:
+
+```bash
+# скрыть строку
+stegobox hide -i photo.png -t "секрет" -p qwerty
+
+# скрыть содержимое файла
+stegobox hide -i photo.png --text-file secret.txt -p qwerty
+
+# скрыть из stdin
+cat secret.txt | stegobox hide -i photo.png -t - -p qwerty
+
+# извлечь в stdout
+stegobox extract -i photo_stego.png -p qwerty
+
+# извлечь в файл
+stegobox extract -i photo_stego.png -p qwerty -o secret.txt
+```
+
+После `./gradlew installDist` бинарник лежит в
+`build/install/stegobox/bin/stegobox`.
+
 ## Структура проекта
 
 ```

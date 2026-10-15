@@ -11,9 +11,11 @@ public final class Main {
     }
 
     public static void main(String[] args) {
+        if (args.length > 0) {
+            System.exit(Cli.run(args));
+        }
+        // GUI-режим
         FlatLightLaf.setup();
-
-        // Немного полируем внешний вид FlatLaf
         UIManager.put("Component.focusWidth", 1);
         UIManager.put("Button.arc", 10);
         UIManager.put("Component.arc", 8);

@@ -7,6 +7,7 @@ import javax.crypto.spec.GCMParameterSpec;
 import javax.crypto.spec.PBEKeySpec;
 import javax.crypto.spec.SecretKeySpec;
 import java.awt.image.BufferedImage;
+import java.io.File;
 import java.nio.charset.StandardCharsets;
 import java.security.SecureRandom;
 import java.util.Arrays;
@@ -221,5 +222,20 @@ public final class StegoEngine {
         } finally {
             spec.clearPassword();
         }
+    }
+
+    public static File buildOutputFile(File source) {
+        File dir = source.getAbsoluteFile().getParentFile();
+        String name = source.getName();
+        int dot = name.lastIndexOf('.');
+        String base = dot > 0 ? name.substring(0, dot) : name;
+
+        File candidate = new File(dir, base + "_stego.png");
+        int counter = 1;
+        while (candidate.exists()) {
+            candidate = new File(dir, base + "_stego_" + counter + ".png");
+            counter++;
+        }
+        return candidate;
     }
 }
