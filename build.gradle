@@ -1,6 +1,5 @@
 plugins {
     id 'java'
-    id 'application'
 }
 
 group = 'ru.mcs'
@@ -20,15 +19,37 @@ dependencies {
     implementation 'com.formdev:flatlaf:3.5.4'
 }
 
-application {
-    mainClass = 'ru.mcs.Main'
-}
-
 tasks.withType(JavaCompile).configureEach {
     options.encoding = 'UTF-8'
 }
 
-run {
-    // чтобы кириллица в UI отображалась корректно даже в Windows-консоли
-    jvmArgs = ['-Dfile.encoding=UTF-8']
+// Отключаем обычный jar — он не нужен
+tasks.named('jar') {
+    enabled = false
+}
+
+// Единственный артефакт — fat jar со всеми зависимостями
+tasks.register('fatJar', Jar) {
+    dependsOn tasks.named('classes')
+
+    archiveBaseName = 'stegobox'
+    archiveClassifier = ''
+    duplicatesStrategy = DuplicatesStrategy.EXCLUDE
+
+    manifest {
+        attributes 'Main-Class': 'ru.mcs.Main'
+    }
+
+    from sourceSets.main.output
+    from {
+        configurations.runtimeClasspath.collect { it.isDirectory() ? it : zipTree(it) }
+    }
+
+    exclude 'META-INF/*.SF', 'META-INF/*.DSA', 'META-INF/*.RSA'
+    exclude 'META-INF/*.MF'
+    exclude 'module-info.class'
+}
+
+tasks.named('build') {
+    dependsOn tasks.named('fatJar')
 }
