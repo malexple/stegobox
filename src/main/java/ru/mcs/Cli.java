@@ -26,7 +26,7 @@ import java.util.Map;
  */
 public final class Cli {
 
-    private static final String VERSION = "1.0.0";
+    private static final String VERSION = "1.1.0";
     private static final String ENV_PASSWORD = "STEKOBOX_PASSWORD";
 
     private Cli() {
@@ -39,7 +39,10 @@ public final class Cli {
                 case "hide" -> cmdHide(parse(args, 1));
                 case "extract" -> cmdExtract(parse(args, 1));
                 case "help", "-h", "--help" -> { printHelp(); yield 0; }
-                case "version", "-v", "--version" -> { System.out.println("StegoBox " + VERSION); yield 0; }
+                case "version", "-v", "--version" -> {
+                    System.out.println("StegoBox " + VERSION);
+                    yield 0;
+                }
                 default -> {
                     System.err.println("Неизвестная команда: " + cmd);
                     System.err.println("Подсказка: stegobox help");

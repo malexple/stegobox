@@ -27,6 +27,7 @@ public final class StegoEngine {
     private static final int SALT_LEN = 16;
     private static final int IV_LEN = 12;
     private static final int TAG_BITS = 128;
+    private static final int TAG_BYTES = TAG_BITS / 8;
     private static final int PBKDF2_ITERATIONS = 120_000;
     private static final int KEY_BITS = 256;
     private static final String CIPHER = "AES/GCM/NoPadding";
@@ -34,6 +35,8 @@ public final class StegoEngine {
 
     private StegoEngine() {
     }
+
+    // ---------- Публичный API ----------
 
     public static BufferedImage hideText(BufferedImage source, String text, char[] password) {
         if (text == null || text.isEmpty()) {
@@ -54,11 +57,12 @@ public final class StegoEngine {
 
         BufferedImage out = toRgb(source);
 
-        long capacityBytes = (long) out.getWidth() * out.getHeight() * 3 / 8;
-        if (data.length > capacityBytes) {
-            throw new IllegalArgumentException(
-                    "Недостаточно места: нужно " + data.length
-                            + " байт, доступно " + capacityBytes + " байт");
+        long capacity = capacityBytes(out);
+        if (data.length > capacity) {
+            throw new IllegalArgumentException(String.format(
+                    "Недостаточно места: нужно %s, доступно %s. "
+                            + "Возьмите картинку большего разрешения или сократите текст.",
+                    humanBytes(data.length), humanBytes(capacity)));
         }
 
         embedBits(out, data);
@@ -76,8 +80,8 @@ public final class StegoEngine {
                 | ((header[2] & 0xFF) << 8)
                 | (header[3] & 0xFF);
 
-        long capacityBytes = (long) image.getWidth() * image.getHeight() * 3 / 8;
-        if (payloadLen <= 0 || payloadLen + 4L > capacityBytes) {
+        long capacity = capacityBytes(image);
+        if (payloadLen <= 0 || payloadLen + 4L > capacity) {
             throw new IllegalStateException("Скрытые данные не найдены");
         }
 
@@ -87,6 +91,56 @@ public final class StegoEngine {
         } catch (Exception e) {
             throw new IllegalStateException("Неверный пароль или повреждённые данные", e);
         }
+    }
+
+    /**
+     * Сколько байт полезной нагрузки поместится в изображение.
+     * Формула: W × H × 3 / 8 (по 3 бита на пиксель).
+     */
+    public static long capacityBytes(BufferedImage image) {
+        return (long) image.getWidth() * image.getHeight() * 3 / 8;
+    }
+
+    /**
+     * Сколько байт займёт зашифрованный текст заданной длины (UTF-8).
+     * Учитывает 4 байта длины, salt, IV и GCM-тег.
+     */
+    public static long payloadSize(int textBytesLength) {
+        return 4L + SALT_LEN + IV_LEN + textBytesLength + TAG_BYTES;
+    }
+
+    /** Сколько байт займёт строка после шифрования. */
+    public static long payloadSize(String text) {
+        return payloadSize(text.getBytes(StandardCharsets.UTF_8).length);
+    }
+
+    /**
+     * Человекочитаемый размер: «512 Б», «14.6 КБ», «3.42 МБ».
+     * Используется и в UI, и в CLI, чтобы сообщения совпадали.
+     */
+    public static String humanBytes(long bytes) {
+        if (bytes < 1024) return bytes + " Б";
+        if (bytes < 1024 * 1024) return String.format("%.1f КБ", bytes / 1024.0);
+        return String.format("%.2f МБ", bytes / (1024.0 * 1024));
+    }
+
+    /**
+     * Формирует путь к выходному файлу рядом с исходником: <имя>_stego.png.
+     * При коллизии добавляет суффикс _stego_N.
+     */
+    public static File buildOutputFile(File source) {
+        File dir = source.getAbsoluteFile().getParentFile();
+        String name = source.getName();
+        int dot = name.lastIndexOf('.');
+        String base = dot > 0 ? name.substring(0, dot) : name;
+
+        File candidate = new File(dir, base + "_stego.png");
+        int counter = 1;
+        while (candidate.exists()) {
+            candidate = new File(dir, base + "_stego_" + counter + ".png");
+            counter++;
+        }
+        return candidate;
     }
 
     // ---------- Встраивание / чтение бит ----------
@@ -134,8 +188,8 @@ public final class StegoEngine {
     }
 
     private static byte[] readBytes(BufferedImage image, int startByte, int count) {
-        long capacityBytes = (long) image.getWidth() * image.getHeight() * 3 / 8;
-        if ((long) startByte + count > capacityBytes) {
+        long capacity = capacityBytes(image);
+        if ((long) startByte + count > capacity) {
             throw new IllegalStateException("Недостаточно данных в изображении");
         }
 
@@ -199,7 +253,7 @@ public final class StegoEngine {
     }
 
     private static String decrypt(byte[] payload, char[] password) throws Exception {
-        if (payload.length < SALT_LEN + IV_LEN + 16) {
+        if (payload.length < SALT_LEN + IV_LEN + TAG_BYTES) {
             throw new IllegalStateException("Повреждённые данные");
         }
         byte[] salt = Arrays.copyOfRange(payload, 0, SALT_LEN);
@@ -222,20 +276,5 @@ public final class StegoEngine {
         } finally {
             spec.clearPassword();
         }
-    }
-
-    public static File buildOutputFile(File source) {
-        File dir = source.getAbsoluteFile().getParentFile();
-        String name = source.getName();
-        int dot = name.lastIndexOf('.');
-        String base = dot > 0 ? name.substring(0, dot) : name;
-
-        File candidate = new File(dir, base + "_stego.png");
-        int counter = 1;
-        while (candidate.exists()) {
-            candidate = new File(dir, base + "_stego_" + counter + ".png");
-            counter++;
-        }
-        return candidate;
     }
 }

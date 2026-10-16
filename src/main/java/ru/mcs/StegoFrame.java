@@ -13,6 +13,8 @@ import javax.swing.JScrollPane;
 import javax.swing.JTextArea;
 import javax.swing.JTextField;
 import javax.swing.SwingWorker;
+import javax.swing.event.DocumentEvent;
+import javax.swing.event.DocumentListener;
 import javax.swing.filechooser.FileNameExtensionFilter;
 import java.awt.BorderLayout;
 import java.awt.FlowLayout;
@@ -86,6 +88,13 @@ public class StegoFrame extends JFrame {
         browseBtn.addActionListener(e -> chooseFile());
         hideBtn.addActionListener(e -> doHide());
         extractBtn.addActionListener(e -> doExtract());
+
+        // Живой индикатор заполнения: пересчитываем при каждом изменении текста
+        textArea.getDocument().addDocumentListener(new DocumentListener() {
+            @Override public void insertUpdate(DocumentEvent e)  { updateFill(); }
+            @Override public void removeUpdate(DocumentEvent e)  { updateFill(); }
+            @Override public void changedUpdate(DocumentEvent e) { updateFill(); }
+        });
     }
 
     private void chooseFile() {
@@ -108,10 +117,48 @@ public class StegoFrame extends JFrame {
             selectedFile = file;
             selectedImage = img;
             pathField.setText(file.getAbsolutePath());
-            statusLabel.setText(String.format("Загружено: %s (%d×%d)",
-                    file.getName(), img.getWidth(), img.getHeight()));
+
+            long cap = StegoEngine.capacityBytes(img);
+            statusLabel.setText(String.format(
+                    "Загружено: %s (%d×%d), ёмкость ≈ %s",
+                    file.getName(), img.getWidth(), img.getHeight(),
+                    StegoEngine.humanBytes(cap)));
+
+            updateFill();
         } catch (IOException ex) {
             showError("Ошибка чтения файла: " + ex.getMessage());
+        }
+    }
+
+    /**
+     * Обновляет статус-строку, показывая сколько займёт текущий текст
+     * и какой это процент от ёмкости картинки.
+     */
+    private void updateFill() {
+        if (selectedImage == null) {
+            return;
+        }
+        String text = textArea.getText();
+        if (text.isEmpty()) {
+            long cap = StegoEngine.capacityBytes(selectedImage);
+            statusLabel.setText("Ёмкость ≈ " + StegoEngine.humanBytes(cap)
+                    + ". Введите текст для сокрытия.");
+            return;
+        }
+        long need = StegoEngine.payloadSize(text);
+        long cap = StegoEngine.capacityBytes(selectedImage);
+        double pct = cap == 0 ? 0 : 100.0 * need / cap;
+
+        if (need > cap) {
+            statusLabel.setText(String.format(
+                    "Заполнение: %s / %s (%.1f%%) — не поместится!",
+                    StegoEngine.humanBytes(need),
+                    StegoEngine.humanBytes(cap), pct));
+        } else {
+            statusLabel.setText(String.format(
+                    "Заполнение: %s / %s (%.1f%%)",
+                    StegoEngine.humanBytes(need),
+                    StegoEngine.humanBytes(cap), pct));
         }
     }
 
@@ -128,6 +175,25 @@ public class StegoFrame extends JFrame {
         char[] password = passwordField.getPassword();
         if (password.length == 0) {
             showError("Введите пароль");
+            return;
+        }
+
+        long need = StegoEngine.payloadSize(text);
+        long cap = StegoEngine.capacityBytes(selectedImage);
+
+        if (need > cap) {
+            JOptionPane.showMessageDialog(this,
+                    String.format(
+                            "Текст не поместится в изображение.%n%n"
+                                    + "Нужно: %s%n"
+                                    + "Доступно: %s%n%n"
+                                    + "Возьмите картинку большего разрешения или сократите текст.",
+                            StegoEngine.humanBytes(need),
+                            StegoEngine.humanBytes(cap)),
+                    "Недостаточно места", JOptionPane.WARNING_MESSAGE);
+            statusLabel.setText("Недостаточно места: нужно "
+                    + StegoEngine.humanBytes(need)
+                    + ", доступно " + StegoEngine.humanBytes(cap));
             return;
         }
 
